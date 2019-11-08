@@ -7,7 +7,10 @@ from datetime import datetime
 # Enable Serial Communication
 ser_port = serial.Serial("/dev/ttyUSB2", baudrate=9600, timeout=0.5)
 
-#======================================== SEND SMS ========================================================
+#====================== SEND SMS =========================================
+
+# Enable Serial Communication
+ser_port = serial.Serial("/dev/ttyUSB0", baudrate=9600, timeout=0.5)
 
 def send_sms():
     dbconnector = sqlite3.connect("/home/pi/BP_client.db")
@@ -16,15 +19,12 @@ def send_sms():
     query = "SELECT payload from sms_TX_Q"
     cursor.execute(query)
     rows = cursor.fetchall()
-        
+
+    #retieving payload getting ready to send sms to the server  
     for row in rows:
         retrieved_list = row[0]
         data = ""
         data = retrieved_list
-        #print(data)
-        update_query = "UPDATE sms_TX_Q SET status = 'Waiting' WHERE status = 'Pending'"
-        cursor.execute(update_query)
-        dbconnector.commit()
 
         # Sending a message to a particular Number
         ser_port.write(str.encode('AT+CMGS="+265886452444"'+'\r\n'))
@@ -39,8 +39,67 @@ def send_sms():
         
         # Enable to send SMS
         ser_port.write(str.encode("\x1A"))
-        print ("Time sent")
-        print  (datetime.now())
+
+        #update status and sms_sent_time after sending smssend sms
+        update_query = "UPDATE sms_TX_Q SET status = 'Waiting' WHERE status = 'Pending'"
+        cursor.execute(update_query)
+        dbconnector.commit()
+
+        dt = datetime.now()
+        timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+        
+        cursor.execute ("UPDATE sms_TX_Q SET sms_sent_time = \""+timestamp+"\" WHERE sms_sent_time = 'Null'")
+        dbconnector.commit()
+
+#====================== RESEND SMS =========================================       
+
+def resend_sms():
+    dbconnector = sqlite3.connect("/home/pi/BP_client.db")
+    cursor = dbconnector.cursor()
+
+    status_query = "SELECT * from sms_TX_Q WHERE status ='Waiting'"
+    cursor.execute(status_query)
+    result_set = cursor.fetchall()
+    for row in result_set:                 
+        current_sms_No = row[1]
+        data = row[2]
+        TTL_counter = row[4]
+        db_time = row[6]
+        db_time_splitted = db_time.split(" ")
+        db_time_Only = db_time_splitted[1]
+        h, m, s = db_time_Only.split(":")
+        db_seconds_only = int(h) * 3600 + int(m) * 60 + int(s)
+        now = datetime.now()
+        c_time = now.strftime("%H:%M:%S")
+        new_current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        ch, cm, cs= c_time.split(":")
+        c_time_seconds_only = int(ch) * 3600 + int(cm) * 60 + int(cs)
+        check_time = c_time_seconds_only - db_seconds_only
+            
+        #check time if it is greater than delay time
+        if check_time > 19:
+                
+            if TTL_counter > 0:
+                new_TTL_counter = TTL_counter-1
+                cursor.execute("UPDATE sms_TX_Q SET TTL_Counter = ? WHERE sms_No = ?",[new_TTL_counter, current_sms_No])
+                dbconnector.commit()
+                # Sending a message to a particular Number
+                ser_port.write(str.encode('AT+CMGS="+265886452444"'+'\r\n'))
+                read_port = ser_port.read(5)
+                #print (read_port)
+                time.sleep(0.01)
+                ser_port.write(str.encode(data))              
+                #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
+                read_port = ser_port.read(1000)
+                print (read_port)
+                # Enable to send SMS
+                ser_port.write(str.encode("\x1A"))
+                    
+            else:
+                cursor.execute("UPDATE sms_TX_Q SET status = ? WHERE sms_No = ?",["Failed", current_sms_No])
+                dbconnector.commit()
+        else:
+            pass
 
 #====================================== PROCESS RESPONSE FROM GSM =================================
 
@@ -64,13 +123,6 @@ def strip_quotes(data = ""):
 def tokenize(strng):
     strings = strng.split("\r\n+CMGL:")
     return strings
-
-def delete_SMSs(sms_no = []):
-    for i in range (len(sms_no)):
-        at_comm = 'AT+CMGD = ' +sms_no[i] + '\r\n'
-        ser_port.write(str.encode(at_comm))
-        ser_port.read(10)
-        #print (at_comm)
 
 def delete_all_GSM():
     # Delete all sms in GSM
@@ -105,10 +157,7 @@ def add2DB(data=[]):
                 #print(accession_No[1])
                 SQL = "INSERT INTO sms_RX_Q(accession_No, response) values(?,?)"
                 data = (accession_No[0], accession_No[1])
-
-                #print(SQL)
-                #print(data)
-                #print(current_str[0])
+                delete_all_GSM()
 
                 try:
                     Cursor.execute(SQL, data)
@@ -120,32 +169,23 @@ def add2DB(data=[]):
     except IndexError:
         pass
 
-#Moving SMSs to db
+#================ loop ================================================
 while(True):
 
     send_sms()
+    resend_sms()
         
     #check inbox
     ser_port.write(str.encode('AT+CMGL="ALL"\r\n'))
     read_port = ser_port.read(10000)
-    #os.system('clear')
-    #time.sleep(1)
+   
     print ("Checking sms in GSM...")
     time.sleep(0.1)
-    #print(read_port)
+    
     add2DB(tokenize(read_port.decode('utf-8')))
         
-    #clear read SMSs
-    #sms_nos
-    #sms_nos = []
-
-    #delay 2sec
-    #time.sleep(1)
-
-    #recall the function
-    #move_SMSs_to_db()
     delete_SMSs(sms_nos)
-    #delete_all_GSM()   
+      
     time.sleep(0.1)
         
         
