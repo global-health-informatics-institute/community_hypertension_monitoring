@@ -163,33 +163,37 @@ def compose_response():
     Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals ORDER BY ID_No ASC")
     rows = Cursor.fetchall()
 
-    #accessing BP record in Vitals table 
     for row in rows:
-        sys_mmHg = row[0]   
-        dia_mmHg = row[1]       
-        accession_No = row[2]   
+        sys_mmHg = row[0]
+        dia_mmHg = row[1]
+        accession_No = row[2]
 
-        #compose a recommentation based on BP status
         if (sys_mmHg > 129 and sys_mmHg < 140) and (dia_mmHg > 84 and dia_mmHg < 90):
             recommendation = "Your Blood pressure is normal."
-            print (recommendation)
             
         if (sys_mmHg > 139 and sys_mmHg < 160) and (dia_mmHg > 89 and dia_mmHg < 100):
-            recommendation = "See clinician within a month"
-            print (recommendation)
+            recommendation = "See clinician within a month."
 
         elif (sys_mmHg > 179) and (dia_mmHg > 110):
-            recommendation = "See clinician within a week"
-            print (recommendation)
+            recommendation = "See clinician within a week."
 
         else:
             pass
 
+        #accessing name of a person in db using accession_No and add it to the response
+        #used accession_No accessed from Vitals to access first_name and last_name in demographic
+        Cursor = dbconnector.cursor()
+        Cursor.execute("SELECT first_name, last_name FROM demographic WHERE accession_No = \""+accession_No+"\"")
+        rows = Cursor.fetchall()
 
-        #concatinating accession_No and recommendation
-        response = accession_No + "|" + recommendation
+        for row in rows:
+            first_name = row[0]
+            last_name = row[1]
 
-        #add response and accession_No to the database
+            name = first_name + " " + last_name     #concatinate first_name and last_name
+        
+        response = name + "," + recommendation      #compose response
+
         try:
             if len(response) > 0:
                 Cursor.execute("INSERT INTO sms_TX_Q(accession_No, response) VALUES(?, ?)",
@@ -198,7 +202,6 @@ def compose_response():
             
         except Error as er:
             print (" An error occured", er.args[0])
-
 
 
 #=============================== SEND SMS ==================================================
