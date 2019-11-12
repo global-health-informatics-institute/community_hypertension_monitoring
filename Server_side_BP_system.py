@@ -135,8 +135,8 @@ def process_sms():
                 dbconnector.commit()
 
                 #insert into SIM table
-                Cursor.execute ("INSERT INTO SIM(SIM_No, mac) VALUES (?, ? )",
-                                (phone_No, mac_address))
+                Cursor.execute ("INSERT INTO SIM(phone_No, mac_address, accession_No) VALUES (?, ?, ?)",
+                                (phone_No, mac_address, accession_No))
                 dbconnector.commit()
 
                 #insert into Nodes table
