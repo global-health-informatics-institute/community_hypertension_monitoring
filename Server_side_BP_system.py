@@ -210,42 +210,52 @@ def send_response():
     
     dbconnector = sqlite3.connect("BP_db.db")
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT response,status FROM sms_TX_Q ORDER BY accession_No ASC")
+    Cursor.execute("SELECT response,status, accession_No FROM sms_TX_Q ORDER BY accession_No ASC")
     rows = Cursor.fetchall()
 
     for row in rows:
         response = row[0]
-        retieved_status = row[1]
-        #print(response)
+        status = row[1]
+        accession_No = row[2]
+        #print(accession_No)
         #print (retieved_status)
         
-        if len(response) > 0 and retieved_status == 'Pending':
-            # Sending a message to a particular Number
-            ser_port.write(str.encode('AT+CMGS="+265885303568"'+'\r\n'))
-            read_port = ser_port.read(5)
-            #print (read_port)
-            time.sleep(0.1)
+        if len(response) > 0 and status == 'Pending':
+            
+            Cursor = dbconnector.cursor()
+            Cursor.execute("SELECT phone_No FROM SIM WHERE accession_No = \""+accession_No+"\"")
+            rows = Cursor.fetchall()
 
-            ser_port.write(str.encode(response))              
-            #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
-            read_port = ser_port.read(1000)
-            #print (read_port)
-                
-            # Enable to send SMS
-            ser_port.write(str.encode("\x1A")) 
-            read_port = ser_port.read(5)
+            for row in rows:
+                SIM_No = row[0]
+                print(SIM_No)
+        
+                # Sending a message to a particular Number
+                ser_port.write(str.encode('AT+CMGS="SIM_No"'+'\r\n'))
+                read_port = ser_port.read(5)
+                #print (read_port)
+                time.sleep(0.1)
 
-            #updating the status of sms from pending to Sent after sending sms
-            Cursor.execute ("UPDATE sms_TX_Q SET status = 'Sent' WHERE status = 'Pending'")
-            dbconnector.commit()
+                ser_port.write(str.encode(response))              
+                #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
+                read_port = ser_port.read(1000)
+                #print (read_port)
+                    
+                # Enable to send SMS
+                ser_port.write(str.encode("\x1A")) 
+                read_port = ser_port.read(5)
 
-            #delete sent response
-            Cursor.execute ("DELETE FROM sms_TX_Q WHERE status = 'Sent'")
-            dbconnector.commit()  
+                #updating the status of sms from pending to Sent after sending sms
+                Cursor.execute ("UPDATE sms_TX_Q SET status = 'Sent' WHERE status = 'Pending'")
+                dbconnector.commit()
 
-        else:
-            print ("Nothing to send")
-            #pass
+                #delete sent response
+                Cursor.execute ("DELETE FROM sms_TX_Q WHERE status = 'Sent'")
+                dbconnector.commit()  
+
+            else:
+                print ("Nothing to send")
+                #pass
 
 
 #================ LOOP =======================================
