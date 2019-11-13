@@ -5,7 +5,7 @@ import serial
 from datetime import datetime
 
 # Enable Serial Communication
-ser_port = serial.Serial("/dev/ttyUSB0", baudrate=9600, timeout=0.5)
+ser_port = serial.Serial("/dev/ttyUSB1", baudrate=9600, timeout=0.5)
 
 def find(str, ch):
     for i, ltr in enumerate(str):
@@ -105,17 +105,18 @@ def process_sms():
         phone_No = row[1]       
         payload = row[2]        
         payload = row[2].split("|")             
-        accession_No = payload[0].split("-")    
+        accession_No = payload[0].split("-")
 
-        mac_address = accession_No[1]           
-        accession_No = payload[0]   
-        natID = payload[1]          
+        mac_address = accession_No[1]
+        accession_No = payload[0]
+        natID = payload[1]
         first_name = payload[2]     
-        last_name = payload[4]      
-        sex = payload[5]            
-        DOB = payload[6]            
-        sys_mmHg = payload[7]       
-        dia_mmHg = payload[8]       
+        last_name = payload[3]
+        sex = payload[4]            
+        DOB = payload[5]
+        sys_mmHg = payload[6]       
+        dia_mmHg = payload[7]
+        
         
         try:
             # moving records from sms_TX_Q table and insert them into other tables in db
@@ -155,7 +156,8 @@ def process_sms():
 
 #====================== COMPOSE RESPONSE ===========================================
 
-def compose_response():   
+def compose_response():
+    
     #db connection
     dbconnector = sqlite3.connect("BP_db.db")
 
@@ -163,10 +165,14 @@ def compose_response():
     Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals ORDER BY ID_No ASC")
     rows = Cursor.fetchall()
 
+    recommendation = ""
+    name = ""
+    response = ""
     for row in rows:
         sys_mmHg = row[0]
         dia_mmHg = row[1]
         accession_No = row[2]
+        print(accession_No)
 
         if (sys_mmHg > 129 and sys_mmHg < 140) and (dia_mmHg > 84 and dia_mmHg < 90):
             recommendation = "Your Blood pressure is normal."
@@ -192,7 +198,9 @@ def compose_response():
 
             name = first_name + " " + last_name     #concatinate first_name and last_name
         
-        response = name + "," + recommendation      #compose response
+        response = accession_No + "|" + name + "," + recommendation      #compose response
+        print(response)
+        print (recommendation)
 
         try:
             if len(response) > 0:
@@ -202,6 +210,7 @@ def compose_response():
             
         except Error as er:
             print (" An error occured", er.args[0])
+
 
 
 #=============================== SEND SMS ==================================================
@@ -227,17 +236,17 @@ def send_response():
             rows = Cursor.fetchall()
 
             for row in rows:
-                SIM_No = row[0]
-                print(SIM_No)
+                sim_No = row[0]
+                print(sim_No)
         
                 # Sending a message to a particular Number
-                ser_port.write(str.encode('AT+CMGS="SIM_No"'+'\r\n'))
+                #ser_port.write(str.encode('AT+CMGS="SIM_No"'+'\r\n'))
+                ser_port.write(b'AT+CMGS="' + sim_No.encode() + b'"\r')
                 read_port = ser_port.read(5)
                 #print (read_port)
                 time.sleep(0.1)
 
                 ser_port.write(str.encode(response))              
-                #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
                 read_port = ser_port.read(1000)
                 #print (read_port)
                     
