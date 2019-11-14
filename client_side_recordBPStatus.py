@@ -5,18 +5,17 @@ import os, time
 from datetime import datetime
 
 # Enable Serial Communication
-ser_port = serial.Serial("/dev/ttyUSB2", baudrate=9600, timeout=0.5)
+ser_port = serial.Serial("/dev/ttyUSB0", baudrate=9600, timeout=0.5)
+
+CLIENT_NUM = "+265886452444"
 
 #====================== SEND SMS =========================================
-
-# Enable Serial Communication
-ser_port = serial.Serial("/dev/ttyUSB0", baudrate=9600, timeout=0.5)
 
 def send_sms():
     dbconnector = sqlite3.connect("/home/pi/BP_client.db")
     cursor = dbconnector.cursor()
 
-    query = "SELECT payload from sms_TX_Q"
+    query = "SELECT payload, status from sms_TX_Q"
     cursor.execute(query)
     rows = cursor.fetchall()
 
@@ -25,31 +24,38 @@ def send_sms():
         retrieved_list = row[0]
         data = ""
         data = retrieved_list
+        status = row[1]
+        print (status)
 
-        # Sending a message to a particular Number
-        ser_port.write(str.encode('AT+CMGS="+265886452444"'+'\r\n'))
-        read_port = ser_port.read(5)
-        #print (read_port)
-        time.sleep(0.1)
+        if status == "Pending":
 
-        ser_port.write(str.encode(data))              
-        #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
-        read_port = ser_port.read(1000)
-        print (read_port)
-        
-        # Enable to send SMS
-        ser_port.write(str.encode("\x1A"))
+            # Sending a message to a particular Number
+            ser_port.write(str.encode('AT+CMGS="+265886452444"'+'\r\n'))
+            read_port = ser_port.read(5)
+            #print (read_port)
+            time.sleep(0.1)
 
-        #update status and sms_sent_time after sending smssend sms
-        update_query = "UPDATE sms_TX_Q SET status = 'Waiting' WHERE status = 'Pending'"
-        cursor.execute(update_query)
-        dbconnector.commit()
+            ser_port.write(str.encode(data))              
+            #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
+            read_port = ser_port.read(1000)
+            print (read_port)
+            
+            # Enable to send SMS
+            ser_port.write(str.encode("\x1A"))
 
-        dt = datetime.now()
-        timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
-        
-        cursor.execute ("UPDATE sms_TX_Q SET sms_sent_time = \""+timestamp+"\" WHERE sms_sent_time = 'Null'")
-        dbconnector.commit()
+            #update status and sms_sent_time after sending smssend sms
+            update_query = "UPDATE sms_TX_Q SET status = 'Waiting' WHERE status = 'Pending'"
+            cursor.execute(update_query)
+            dbconnector.commit()
+
+            dt = datetime.now()
+            timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+            
+            cursor.execute ("UPDATE sms_TX_Q SET sms_sent_time = \""+timestamp+"\" WHERE sms_sent_time = 'Null'")
+            dbconnector.commit()
+
+        else:
+            pass
 
 #====================== RESEND SMS =========================================       
 
@@ -64,21 +70,23 @@ def resend_sms():
         current_sms_No = row[1]
         data = row[2]
         TTL_counter = row[4]
-        db_time = row[6]
+        db_time = row[7]
         db_time_splitted = db_time.split(" ")
         db_time_Only = db_time_splitted[1]
+        print(db_time_Only)
         h, m, s = db_time_Only.split(":")
         db_seconds_only = int(h) * 3600 + int(m) * 60 + int(s)
         now = datetime.now()
         c_time = now.strftime("%H:%M:%S")
+        print(c_time)
         new_current_time = now.strftime("%Y-%m-%d %H:%M:%S")
         ch, cm, cs= c_time.split(":")
         c_time_seconds_only = int(ch) * 3600 + int(cm) * 60 + int(cs)
         check_time = c_time_seconds_only - db_seconds_only
+        print(check_time)
             
         #check time if it is greater than delay time
-        if check_time > 19:
-                
+        if check_time > 19:      
             if TTL_counter > 0:
                 new_TTL_counter = TTL_counter-1
                 cursor.execute("UPDATE sms_TX_Q SET TTL_Counter = ? WHERE sms_No = ?",[new_TTL_counter, current_sms_No])
@@ -184,7 +192,7 @@ while(True):
     
     add2DB(tokenize(read_port.decode('utf-8')))
         
-    delete_SMSs(sms_nos)
+    #delete_SMSs(sms_nos)
       
     time.sleep(0.1)
         

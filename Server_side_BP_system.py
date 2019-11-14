@@ -5,7 +5,7 @@ import serial
 from datetime import datetime
 
 # Enable Serial Communication
-ser_port = serial.Serial("/dev/ttyUSB1", baudrate=9600, timeout=0.5)
+ser_port = serial.Serial("/dev/ttyUSB0", baudrate=9600, timeout=0.5)
 
 def find(str, ch):
     for i, ltr in enumerate(str):
@@ -71,7 +71,7 @@ def add2DB(data=[]):
                 tstamp, payload = splitted[0], splitted[1]
                 accession_No = payload.split("|")
                 #print(accession_No[0])
-                print("TIMESTAMP")
+                #print("TIMESTAMP")
                 print (tstamp)
                 SQL = "INSERT INTO sms_RX_Q(sms_No, Rec, phone_No, time_stamp, payload,accession_No) values(?,?,?,?,?,?)"
                 data = (current_str[0], strip_quotes(current_str[1]), strip_quotes(current_str[2]), strip_quotes(current_str[4] + tstamp), payload, accession_No[0])
@@ -150,7 +150,8 @@ def process_sms():
                 dbconnector.commit()
 
         except sqlite3.IntegrityError as e:
-                print('sqlite error: ', e.args[0])
+                #print('sqlite error: ', e.args[0])
+                pass
 
                 
 
@@ -172,20 +173,23 @@ def compose_response():
         sys_mmHg = row[0]
         dia_mmHg = row[1]
         accession_No = row[2]
-        print(accession_No)
+        #print(accession_No)
 
-        if (sys_mmHg > 129 and sys_mmHg < 140) and (dia_mmHg > 84 and dia_mmHg < 90):
+        if (sys_mmHg in range (100, 140)) and (dia_mmHg in range (50, 90)):
             recommendation = "Your Blood pressure is normal."
-            
-        if (sys_mmHg > 139 and sys_mmHg < 160) and (dia_mmHg > 89 and dia_mmHg < 100):
+            print (recommendation)
+
+        if (sys_mmHg in range (141, 160)) and (dia_mmHg in range (91, 100)):
             recommendation = "See clinician within a month."
+            print (recommendation)
 
         elif (sys_mmHg > 179) and (dia_mmHg > 110):
             recommendation = "See clinician within a week."
+            print (recommendation)
 
         else:
             pass
-
+        
         #accessing name of a person in db using accession_No and add it to the response
         #used accession_No accessed from Vitals to access first_name and last_name in demographic
         Cursor = dbconnector.cursor()
@@ -198,9 +202,11 @@ def compose_response():
 
             name = first_name + " " + last_name     #concatinate first_name and last_name
         
-        response = accession_No + "|" + name + "," + recommendation      #compose response
-        print(response)
-        print (recommendation)
+        response = accession_No + "|" + name + " " + recommendation    
+        #print(response)
+        #compose response
+        #print(response)
+        #print (recommendation)
 
         try:
             if len(response) > 0:
@@ -209,7 +215,8 @@ def compose_response():
                 dbconnector.commit()
             
         except Error as er:
-            print (" An error occured", er.args[0])
+            #print (" An error occured", er.args[0])
+            pass
 
 
 
@@ -237,7 +244,7 @@ def send_response():
 
             for row in rows:
                 sim_No = row[0]
-                print(sim_No)
+                #print(sim_No)
         
                 # Sending a message to a particular Number
                 #ser_port.write(str.encode('AT+CMGS="SIM_No"'+'\r\n'))
@@ -263,8 +270,8 @@ def send_response():
                 dbconnector.commit()  
 
             else:
-                print ("Nothing to send")
-                #pass
+                #print ("Nothing to send")
+                pass
 
 
 #================ LOOP =======================================
@@ -273,7 +280,7 @@ def send_response():
 while(True):
     ser_port.write(str.encode('AT+CMGL="ALL"\r\n'))
     read_port = ser_port.read(10000)
-    print ("Checking sms in GSM...")
+    print ("Running...")
     time.sleep(0.1)
 
     
