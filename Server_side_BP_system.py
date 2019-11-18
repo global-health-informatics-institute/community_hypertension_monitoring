@@ -150,8 +150,7 @@ def process_sms():
                 dbconnector.commit()
 
         except sqlite3.IntegrityError as e:
-                #print('sqlite error: ', e.args[0])
-                pass
+                print('sqlite error: ', e.args[0])
 
                 
 
@@ -176,10 +175,12 @@ def compose_response():
         #print(accession_No)
 
         if (sys_mmHg in range (100, 140)) and (dia_mmHg in range (50, 90)):
+        #if (sys_mmHg > 129 and sys_mmHg < 140) and (dia_mmHg > 84 and dia_mmHg < 90):
             recommendation = "Your Blood pressure is normal."
             print (recommendation)
 
-        if (sys_mmHg in range (141, 160)) and (dia_mmHg in range (91, 100)):
+        if (sys_mmHg in range (141, 160)) and (dia_mmHg in range (91, 100)):   
+        #if (sys_mmHg > 139 and sys_mmHg < 160) and (dia_mmHg > 89 and dia_mmHg < 100):
             recommendation = "See clinician within a month."
             print (recommendation)
 
@@ -200,12 +201,12 @@ def compose_response():
             first_name = row[0]
             last_name = row[1]
 
-            name = first_name + " " + last_name     #concatinate first_name and last_name
+            name = first_name + " " + last_name + ", " + "your current BP is; " + str(sys_mmHg) + "/" + str(dia_mmHg) + "."        #concatinate first_name and last_name
         
         response = accession_No + "|" + name + " " + recommendation    
-        #print(response)
+        print(name)
         #compose response
-        #print(response)
+        print(response)
         #print (recommendation)
 
         try:
@@ -215,9 +216,7 @@ def compose_response():
                 dbconnector.commit()
             
         except Error as er:
-            #print (" An error occured", er.args[0])
-            pass
-
+            print (" An error occured", er.args[0])
 
 
 #=============================== SEND SMS ==================================================
@@ -247,15 +246,14 @@ def send_response():
                 #print(sim_No)
         
                 # Sending a message to a particular Number
-                #ser_port.write(str.encode('AT+CMGS="SIM_No"'+'\r\n'))
                 ser_port.write(b'AT+CMGS="' + sim_No.encode() + b'"\r')
                 read_port = ser_port.read(5)
-                #print (read_port)
                 time.sleep(0.1)
 
                 ser_port.write(str.encode(response))              
                 read_port = ser_port.read(1000)
-                #print (read_port)
+                time.sleep(0.1)
+                print (read_port)
                     
                 # Enable to send SMS
                 ser_port.write(str.encode("\x1A")) 
@@ -270,8 +268,7 @@ def send_response():
                 dbconnector.commit()  
 
             else:
-                #print ("Nothing to send")
-                pass
+                print ("Nothing to send")
 
 
 #================ LOOP =======================================
