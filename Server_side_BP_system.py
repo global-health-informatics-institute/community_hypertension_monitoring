@@ -89,7 +89,7 @@ def add2DB(data=[]):
 
             
 
-#==================== PROCESS SMS =======================================
+#============================================================================== PROCESS SMS ===================================================================================
 
 def process_sms():
     #db connection
@@ -154,7 +154,7 @@ def process_sms():
 
                 
 
-#====================== COMPOSE RESPONSE ===========================================
+#======================================================================== COMPOSE RESPONSE =======================================================================================
 
 def compose_response():
     
@@ -162,34 +162,58 @@ def compose_response():
     dbconnector = sqlite3.connect("BP_db.db")
 
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals ORDER BY ID_No ASC")
+    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals LIMIT 0,1")
     rows = Cursor.fetchall()
 
     recommendation = ""
     name = ""
     response = ""
     for row in rows:
-        sys_mmHg = row[0]
-        dia_mmHg = row[1]
+        row1_sys_mmHg = row[0]
+        row1_dia_mmHg = row[1]
         accession_No = row[2]
-        #print(accession_No)
+        
+        print(row1_sys_mmHg)
+        print(row1_dia_mmHg)
 
-        if (sys_mmHg in range (100, 140)) and (dia_mmHg in range (50, 90)):
-        #if (sys_mmHg > 129 and sys_mmHg < 140) and (dia_mmHg > 84 and dia_mmHg < 90):
-            recommendation = "Your Blood pressure is normal."
-            print (recommendation)
+    Cursor = dbconnector.cursor()
+    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals LIMIT 1,1")
+    rows = Cursor.fetchall()
+    for row in rows:
+        row2_sys_mmHg = row[0]
+        row2_dia_mmHg = row[1]
 
-        if (sys_mmHg in range (141, 160)) and (dia_mmHg in range (91, 100)):   
-        #if (sys_mmHg > 139 and sys_mmHg < 160) and (dia_mmHg > 89 and dia_mmHg < 100):
-            recommendation = "See clinician within a month."
-            print (recommendation)
+        print (row2_sys_mmHg)
+        print (row2_dia_mmHg)
 
-        elif (sys_mmHg > 179) and (dia_mmHg > 110):
-            recommendation = "See clinician within a week."
-            print (recommendation)
+    # composing a recommandation base on the BP range
 
-        else:
-            pass
+    if (row1_sys_mmHg in range (100, 140)) and (row1_dia_mmHg in range (50, 90)):
+        recommendation = "Your Blood pressure is normal."
+        print (recommendation)
+
+    elif (row1_sys_mmHg in range (141, 160)) and (row1_dia_mmHg in range (91, 100)):
+        recommendation = "See clinician within a month."
+        print (recommendation)
+
+    elif (row1_sys_mmHg > 179) and (row1_dia_mmHg > 110):
+        recommendation = "See clinician within a week."
+        print (recommendation)
+
+    else:
+        pass
+
+
+    # Comparering current result with previous result
+
+    if (row2_sys_mmHg > row1_sys_mmHg) and (row2_dia_mmHg > row1_dia_mmHg):
+        comment = "(Your BP is improving)"
+        print (comment)
+
+    else:
+        comment = "(Your BP is not improving)"
+        print (comment)
+        
         
         #accessing name of a person in db using accession_No and add it to the response
         #used accession_No accessed from Vitals to access first_name and last_name in demographic
@@ -201,9 +225,9 @@ def compose_response():
             first_name = row[0]
             last_name = row[1]
 
-            name = first_name + " " + last_name + ", " + "your current BP is; " + str(sys_mmHg) + "/" + str(dia_mmHg) + "."        #concatinate first_name and last_name
+            name = first_name + " " + last_name + ", " + "your previous BP; " + str(row1_sys_mmHg) + "/" + str(row1_dia_mmHg) + "," + "your current BP; " + str(row2_sys_mmHg) + "/" + str(row2_dia_mmHg)
         
-        response = accession_No + "|" + name + " " + recommendation    
+        response = accession_No + "|" + name + " " + recommendation + comment    
         print(name)
         #compose response
         print(response)
@@ -219,7 +243,7 @@ def compose_response():
             print (" An error occured", er.args[0])
 
 
-#=============================== SEND SMS ==================================================
+#=============================================================================== SEND SMS =====================================================================================================================
 
 def send_response():
     
@@ -271,7 +295,7 @@ def send_response():
                 print ("Nothing to send")
 
 
-#================ LOOP =======================================
+#================================================================================= LOOP ==============================================================================
 
 
 while(True):
