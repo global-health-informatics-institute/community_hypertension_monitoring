@@ -161,8 +161,17 @@ def compose_response():
     #db connection
     dbconnector = sqlite3.connect("BP_db.db")
 
+    #retrieve natID in first row
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals LIMIT 0,1")
+    Cursor.execute("SELECT ID_No FROM Vitals LIMIT 0,1")
+    rows = Cursor.fetchall()
+
+    for row in rows:
+        natID = row[0]
+        #print(natID)
+
+    Cursor = dbconnector.cursor()
+    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals WHERE ID_No = \""+natID+"\" ORDER BY time_stamp DESC LIMIT 0,1")
     rows = Cursor.fetchall()
 
     recommendation = ""
@@ -173,18 +182,18 @@ def compose_response():
         row1_dia_mmHg = row[1]
         accession_No = row[2]
         
-        print(row1_sys_mmHg)
-        print(row1_dia_mmHg)
+        #print(row1_sys_mmHg)
+        #print(row1_dia_mmHg)
 
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals LIMIT 1,1")
+    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals WHERE ID_No = \""+natID+"\" ORDER BY time_stamp DESC LIMIT 1,1")
     rows = Cursor.fetchall()
     for row in rows:
         row2_sys_mmHg = row[0]
         row2_dia_mmHg = row[1]
 
-        print (row2_sys_mmHg)
-        print (row2_dia_mmHg)
+        #print (row2_sys_mmHg)
+        #print (row2_dia_mmHg)
 
     # composing a recommandation base on the BP range
 
@@ -216,7 +225,7 @@ def compose_response():
         
         
         #accessing name of a person in db using accession_No and add it to the response
-        #used accession_No accessed from Vitals to access first_name and last_name in demographic
+        #used accession_No accessed from Vitals to access first_name and last_name in  demographic
         Cursor = dbconnector.cursor()
         Cursor.execute("SELECT first_name, last_name FROM demographic WHERE accession_No = \""+accession_No+"\"")
         rows = Cursor.fetchall()
@@ -228,9 +237,9 @@ def compose_response():
             name = first_name + " " + last_name + ", " + "your previous BP; " + str(row1_sys_mmHg) + "/" + str(row1_dia_mmHg) + "," + "your current BP; " + str(row2_sys_mmHg) + "/" + str(row2_dia_mmHg)
         
         response = accession_No + "|" + name + " " + recommendation + comment    
-        print(name)
+        #print(name)
         #compose response
-        print(response)
+        #print(response)
         #print (recommendation)
 
         try:
