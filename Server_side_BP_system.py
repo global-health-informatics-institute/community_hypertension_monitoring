@@ -76,7 +76,8 @@ def add2DB(data=[]):
                 if len(accession_No) > 1:
                     #print(accession_No[0])
                     #print("TIMESTAMP")
-                    print (tstamp)
+                    #print (tstamp)
+                    print ("sms received")
                     SQL = "INSERT INTO sms_RX_Q(sms_No, Rec, phone_No, time_stamp, payload,accession_No) values(?,?,?,?,?,?)"
                     data = (current_str[0], strip_quotes(current_str[1]), strip_quotes(current_str[2]), strip_quotes(current_str[4] + tstamp), payload, accession_No[0])
                     delete_all_GSM()
@@ -86,10 +87,11 @@ def add2DB(data=[]):
                         #print("=====")
                         
                     except Error as er:
-                        print("An error occured:", er.args[0])
+                        #print("An error occured:", er.args[0])
+                        pass
 
                 else:
-                    pass
+                    add2DB(tokenize(read_port.decode('utf-8')))
 
     except IndexError:
         pass
@@ -133,23 +135,23 @@ def process_sms():
                 # delete processed records in sms_RX_Q
 
                 #insert into demographic table
-                Cursor.execute("INSERT INTO demographic(ID_No, first_name, last_name, DOB, sex,accession_No) VALUES(?, ?, ?, ?, ?, ?)",
-                                (natID, fName, lName, DOB,gender, accession_No))
+                Cursor.execute("INSERT or IGNORE INTO demographic(ID_No, first_name, last_name, DOB, sex) VALUES(?, ?, ?, ?, ?)",
+                                (natID, fName, lName, DOB,gender))
                 dbconnector.commit()
 
                     
                 #insert into Vitals table
-                Cursor.execute ("INSERT INTO Vitals(ID_No, time_stamp,sys_mmHg, dia_mmHg,accession_No) VALUES (?, ?,?, ?, ? )",
+                Cursor.execute ("INSERT or IGNORE INTO Vitals(ID_No, time_stamp,sys_mmHg, dia_mmHg,accession_No) VALUES (?, ?,?, ?, ? )",
                                 (natID, timestamp, BPsys, BPdia,accession_No))
                 dbconnector.commit()
 
                 #insert into SIM table
-                Cursor.execute ("INSERT INTO SIM(phone_No, mac_address, accession_No) VALUES (?, ?, ?)",
+                Cursor.execute ("INSERT or IGNORE INTO SIM(phone_No, mac_address, accession_No) VALUES (?, ?, ?)",
                                 (phone, mac, accession_No))
                 dbconnector.commit()
 
                 #insert into Nodes table
-                Cursor.execute ("INSERT INTO Nodes(mac_address, timestamp) VALUES (?, ? )",
+                Cursor.execute ("INSERT or IGNORE INTO Nodes(mac_address, timestamp) VALUES (?, ? )",
                                 (mac, timestamp))
                 dbconnector.commit()
                     
@@ -159,14 +161,14 @@ def process_sms():
 
             except sqlite3.IntegrityError as e:
                 print('sqlite error: ', e.args[0])
+                #pass
                 
 
         else:
-            process_sms()
+            pass
 
 
 #======================================================================== COMPOSE RESPONSE =======================================================================================
-
 
 def compose_response():
     
@@ -175,15 +177,22 @@ def compose_response():
 
     #retrieve natID in first row
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT ID_No,accession_No FROM Vitals LIMIT 0,1")
+    Cursor.execute("SELECT ID_No FROM Vitals LIMIT 0,1")
     rows = Cursor.fetchall()
 
+    natID = ""
+    fName = ""
+    lName = ""
+    accession_No = ""
+    current_BPsys = int()
+    current_BPdia = int()
+    previous_BPsys = int()
+    previous_BPdia = int()
+    
     for row in rows:
-        if len(row[0]) > 1:
-            natID = row[0]
-            accession_No1 = row[1]
-        else:
-            compose_response()
+        natID = row[0]
+
+        #print (natID)
 
     Cursor = dbconnector.cursor()
     Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals WHERE ID_No = \""+natID+"\" ORDER BY time_stamp LIMIT 0,1")
@@ -194,24 +203,29 @@ def compose_response():
     reply = ""
     response = ""
 
+
     for row in rows:
+            
         current_BPsys = row[0]
         current_BPdia = row[1]
         accession_No = row[2]
 
     #Response
-            
-    if (current_BPsys in range (100, 140)) and (current_BPdia in range (50, 90)):
-        recommendation = "Your Blood pressure is normal."
-        print (recommendation)
+    if current_BPsys > 1 and current_BPdia > 1:
+                
+        if (current_BPsys in range (100, 140)) and (current_BPdia in range (50, 90)):
+            recommendation = " Your Blood pressure is normal"
+            #print (recommendation)
 
-    elif (current_BPsys in range (141, 160)) and (current_BPdia in range (91, 100)):
-        recommendation = "See clinician within a month."
-        print (recommendation)
+        elif (current_BPsys in range (141, 160)) and (current_BPdia in range (91, 100)):
+            recommendation = " See clinician within a month"
+            #print (recommendation)
 
-    elif (current_BPsys > 179) and (current_BPdia > 110):
-        recommendation = "See clinician within a week."
-        print (recommendation)
+        elif (current_BPsys > 179) and (current_BPdia > 110):
+            recommendation = " See clinician within a week"
+            #print (recommendation)
+        else:
+            pass
 
     else:
         pass
@@ -219,7 +233,7 @@ def compose_response():
     
     #Comparison
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT sys_mmHg, dia_mmHg, accession_No FROM Vitals WHERE ID_No = \""+natID+"\" ORDER BY time_stamp LIMIT 1,1")
+    Cursor.execute("SELECT sys_mmHg, dia_mmHg FROM Vitals WHERE ID_No = \""+natID+"\" ORDER BY time_stamp LIMIT 1,1")
     rows = Cursor.fetchall()
     for row in rows:
         if len(str(row[0])) < 1  or len(str(row[1])) < 1:
@@ -230,13 +244,18 @@ def compose_response():
             previous_BPdia = row[1]
 
 
-            if (previous_BPsys > current_BPsys) and (previous_BPdia > current_BPdia):
-                comment = "After comparing current with previous BP, your BP has improved."
-                print (comment)
+            if previous_BPsys > 1 and previous_BPdia > 1:
+                
+                if (previous_BPsys > current_BPsys) and (previous_BPdia > current_BPdia):
+                    comment = " After comparing current with previous BP your BP has improved "
+                    #print (comment)
 
-            elif (previous_BPsys < current_BPsys) and (previous_BPdia < current_BPdia):
-                comment = "After comparing with current and previous BP, your BP has not improved."
-                print (comment)
+                elif (previous_BPsys < current_BPsys) and (previous_BPdia < current_BPdia):
+                    comment = " After comparing with current and previous BP your BP has not improved "
+                    #print (comment)
+
+                else:
+                    pass
 
             else:
                 pass
@@ -245,24 +264,29 @@ def compose_response():
     #accessing name of a person in db using accession_No and add it to the response
     #used accession_No accessed from Vitals to access first_name and last_name in  demographic
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT first_name, last_name FROM demographic WHERE accession_No = \""+accession_No1+"\"")
+    Cursor.execute("SELECT first_name, last_name FROM demographic WHERE ID_No = \""+natID+"\"")
     rows = Cursor.fetchall()
 
     for row in rows:
         fName = row[0]
         lName = row[1]
 
-    reply = fName + " " + lName + ", " + "your current BP is " + str(current_BPsys) + "/" + str(current_BPdia) + "," + "your previous BP is " + str(previous_BPsys) + "/" + str(previous_BPdia) +". "
+    reply = fName + " " + lName + " your current BP is " + str(current_BPsys) + "/" + str(current_BPdia)  + " your previous BP is " + str(previous_BPsys) + "/" + str(previous_BPdia) 
             
-    response = accession_No1 + "|" + reply + " " + recommendation + comment    
+    response = accession_No + "|" + reply + " " + recommendation + comment    
 
     try:
-        Cursor.execute("INSERT INTO sms_TX_Q(accession_No, response) VALUES(?, ?)",
-                    (accession_No,response))
-        dbconnector.commit()
+        if len(response) > 60:
                 
+            Cursor.execute("INSERT INTO sms_TX_Q(accession_No, response) VALUES(?, ?)",
+                        (accession_No,response))
+            dbconnector.commit()
+        else:
+            pass
+                    
     except Error as er:
-            print (" An error occured", er.args[0])
+            #print (" An error occured", er.args[0])
+        pass
 
 
 #=============================================================================== SEND SMS =====================================================================================================================
@@ -271,7 +295,7 @@ def send_response():
     
     dbconnector = sqlite3.connect("BP_db.db")
     Cursor = dbconnector.cursor()
-    Cursor.execute("SELECT response,status, accession_No FROM sms_TX_Q ORDER BY accession_No ASC")
+    Cursor.execute("SELECT response,status, accession_No FROM sms_TX_Q")
     rows = Cursor.fetchall()
 
     for row in rows:
@@ -305,16 +329,18 @@ def send_response():
                 ser_port.write(str.encode("\x1A")) 
                 read_port = ser_port.read(5)
 
+                print ("response sent")
+
                 #updating the status of sms from pending to Sent after sending sms
                 Cursor.execute ("UPDATE sms_TX_Q SET status = 'Sent' WHERE status = 'Pending'")
                 dbconnector.commit()
 
                 #delete sent response
-                Cursor.execute ("DELETE FROM sms_TX_Q WHERE status = 'Sent'")
-                dbconnector.commit()  
+                #Cursor.execute ("DELETE FROM sms_TX_Q WHERE status = 'Sent'")
+                #dbconnector.commit()  
 
-            else:
-                print ("Nothing to send")
+        else:
+            pass
 
 
 #================================================================================= LOOP ==================================================================================
@@ -328,17 +354,13 @@ while(True):
 
     
     #print(read_port)
-
     add2DB(tokenize(read_port.decode('utf-8')))
     
     process_sms()
-
     compose_response()
-
     send_response()
     
     sms_nos = []
-    
     time.sleep(0.1)
             
         
