@@ -26,34 +26,25 @@ def send_sms():
     dbconnector = sqlite3.connect("/home/pi/BP_client.db")
     cursor = dbconnector.cursor()
 
-    query = "SELECT payload, status, sms_No from sms_TX_Q"
+    query = "SELECT payload, sms_No from sms_TX_Q WHERE status = 'Pending' LIMIT 0,1"
     cursor.execute(query)
     rows = cursor.fetchall()
 
     #retieving payload getting ready to send sms to the server  
     for row in rows:
         payload = row[0]
-        status = row[1]
-        sms_No = row[2]
+        sms_No = row[1]
 
-        #print (mac)
+        if len(payload) > 0 and sms_No > 0:
+            cursor.execute ("UPDATE sms_TX_Q SET mac = \""+mac+"\" WHERE mac = 'not_set'")
+            dbconnector.commit()
 
-        cursor.execute ("UPDATE sms_TX_Q SET mac = \""+mac+"\" WHERE mac = 'not_set'")
-        dbconnector.commit()
+            #print (sms_No)
+            accession_No = str(sms_No) +"-"+mac
+            sms = accession_No + "|"+ payload
 
-        #print (sms_No)
-        accession_No = str(sms_No) +"-"+mac
-        sms = accession_No + "|"+ payload
-        print (sms)
-        #print (accession_No)
-
-        cursor.execute ("UPDATE sms_TX_Q SET accession_No = \""+accession_No+"\" WHERE accession_No = 'not_set'")
-        dbconnector.commit()
-
-        #cursor.execute ("UPDATE sms_TX_Q SET payload = \""+sms+"\" WHERE payload = \""+payload+"\"")
-        #dbconnector.commit()
-
-        if status == "Pending":
+            cursor.execute ("UPDATE sms_TX_Q SET accession_No = \""+accession_No+"\" WHERE accession_No = 'not_set'")
+            dbconnector.commit()
 
             # Sending a message to a particular Number
             ser_port.write(b'AT+CMGS="'+ server_Num.encode() + b'"\r\n')
@@ -65,30 +56,32 @@ def send_sms():
             #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
             read_port = ser_port.read(1000)
             print (read_port)
-                
+                    
             # Enable to send SMS
             ser_port.write(str.encode("\x1A"))
             #update status and sms_sent_time after sending smssend sms
+
+            print ("Sent")
             update_query = "UPDATE sms_TX_Q SET status = 'Waiting' WHERE status = 'Pending'"
             cursor.execute(update_query)
-            dbconnector.commit()
+            dbconnector.commit()            
 
             dt = datetime.now()
             timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
-                
+                    
             cursor.execute ("UPDATE sms_TX_Q SET sms_sent_time = \""+timestamp+"\" WHERE sms_sent_time = 'Null'")
             dbconnector.commit()
 
         else:
-            print ("No sms to send")
+            pass
 
 #=============================================================== RESEND SMS =======================================================================       
 
 def resend_sms():
-    dbconnector = sqlite3.connect("BP_client.db")
+    dbconnector = sqlite3.connect("/home/pi/BP_client.db")
     cursor = dbconnector.cursor()
 
-    status_query = "SELECT sms_No, payload, TTL_counter, sms_sent_time from sms_TX_Q WHERE status ='Waiting'"
+    status_query = "SELECT sms_No, payload, TTL_counter, sms_sent_time, accession_No from sms_TX_Q WHERE status ='Waiting'"
     cursor.execute(status_query)
     result_set = cursor.fetchall()
     for row in result_set:                 
@@ -96,6 +89,8 @@ def resend_sms():
         data = row[1]
         TTL_counter = row[2]
         db_time = row[3]
+        accession_No = row[4]
+        payload = accession_No + "|" + data
         
         if db_time is "Null":
             pass
@@ -124,7 +119,7 @@ def resend_sms():
                     read_port = ser_port.read(5)
                     #print (read_port)
                     time.sleep(0.01)
-                    ser_port.write(str.encode(data))              
+                    ser_port.write(str.encode(payload))              
                     #ser_port.write(str.encode('GSM Shield testing 9999999\r\n'))
                     read_port = ser_port.read(1000)
                     print (read_port)
@@ -169,7 +164,7 @@ def delete_all_GSM():
 
 def add2DB(data=[]):
     #db connection
-    dbconnector = sqlite3.connect("BP_client.db")
+    dbconnector = sqlite3.connect("/home/pi/BP_client.db")
 
     #create cursor to work with db
     Cursor = dbconnector.cursor()
@@ -186,7 +181,7 @@ def add2DB(data=[]):
                 #print (current_str[5])
                 response = splitted[1]
                 response = response.split("\n")[1]
-                #print(response)
+                print(response)
                 accession_No = response.split("|")
                 accession_No[0]
                 #print(accession_No)
